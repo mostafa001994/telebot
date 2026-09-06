@@ -48,8 +48,15 @@ debugLog("Start");
 require_once __DIR__ . '/config/config.php';
 debugLog("config loaded");
 
+debugLog("DB_HOST: " . DB_HOST);
+debugLog("DB_PORT: " . DB_PORT);
+debugLog("DB_NAME: " . DB_NAME);
+debugLog("DB_USER: " . DB_USER);
+
 require_once __DIR__ . '/config/database.php';
 debugLog("database loaded");
+
+
 
 require_once __DIR__ . '/config/constants.php';
 debugLog("constants loaded");
