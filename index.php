@@ -64,24 +64,42 @@ if ($secret !== BOT_SECRET) {
 
 debugLog("Secret OK");
 
+
+// Core
 require_once __DIR__ . '/core/Telegram.php';
 debugLog("Telegram loaded");
-
-require_once __DIR__ . '/handlers/BaseHandler.php';
-debugLog("BaseHandler loaded");
 
 require_once __DIR__ . '/core/Router.php';
 debugLog("Router loaded");
 
+
+// Base Handler
+require_once __DIR__ . '/handlers/BaseHandler.php';
+debugLog("BaseHandler loaded");
+
+
+// Models
 require_once __DIR__ . '/models/User.php';
 require_once __DIR__ . '/models/UserState.php';
 debugLog("Models loaded");
 
+
+// Services
 require_once __DIR__ . '/services/UserService.php';
 require_once __DIR__ . '/services/StateService.php';
+require_once __DIR__ . '/services/SubscriptionService.php';
+require_once __DIR__ . '/services/PaymentService.php';
+require_once __DIR__ . '/services/ZarinPalService.php';
 debugLog("Services loaded");
 
+
+// Keyboards
 require_once __DIR__ . '/keyboards/MainKeyboard.php';
+require_once __DIR__ . '/keyboards/SubscriptionKeyboard.php';
+debugLog("Keyboards loaded");
+
+
+// Handlers
 require_once __DIR__ . '/handlers/StartHandler.php';
 require_once __DIR__ . '/handlers/BuyHandler.php';
 require_once __DIR__ . '/handlers/ProfileHandler.php';
@@ -91,6 +109,7 @@ require_once __DIR__ . '/handlers/CallbackHandler.php';
 require_once __DIR__ . '/handlers/MessageHandler.php';
 require_once __DIR__ . '/handlers/ContactHandler.php';
 debugLog("Handlers loaded");
+
 
 $update = json_decode(
     file_get_contents('php://input'),
