@@ -30,7 +30,7 @@ file_put_contents(
             "سلام {$telegramUser['first_name']} 👋
 
 به ربات فروش اشتراک خوش آمدید.",
-            //MainKeyboard::get()
+            MainKeyboard::get()
         );
     }
 }
