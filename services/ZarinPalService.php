@@ -6,7 +6,7 @@ class ZarinPalService
 
     public function __construct()
     {
-        $this->merchantId = "ZARINPAL_MERCHANT_ID";
+        $this->merchantId = getenv('ZARINPAL_MERCHANT_ID') ?: '';
     }
 
     public function request(int $amount, string $callbackUrl)
@@ -18,16 +18,51 @@ class ZarinPalService
             "description" => "Subscription Payment",
         ];
 
-        $ch = curl_init("https://api.zarinpal.com/pg/v4/payment/request.json");
+        $ch = curl_init(
+            "https://api.zarinpal.com/pg/v4/payment/request.json"
+        );
 
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode(
+                $data,
+                JSON_UNESCAPED_UNICODE
+            ),
+            CURLOPT_HTTPHEADER => [
+                "Content-Type: application/json"
+            ],
+            CURLOPT_TIMEOUT => 30,
+        ]);
 
-        $result = json_decode(curl_exec($ch), true);
+        $response = curl_exec($ch);
+
+        if ($response === false) {
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            return [
+                'ok' => false,
+                'error' => $error,
+            ];
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         curl_close($ch);
+
+        $result = json_decode($response, true);
+
+        if (!is_array($result)) {
+            return [
+                'ok' => false,
+                'error' => 'Invalid JSON response from ZarinPal',
+                'http_code' => $httpCode,
+                'raw_response' => $response,
+            ];
+        }
+
+        $result['_http_code'] = $httpCode;
 
         return $result;
     }
@@ -40,16 +75,48 @@ class ZarinPalService
             "authority" => $authority,
         ];
 
-        $ch = curl_init("https://api.zarinpal.com/pg/v4/payment/verify.json");
+        $ch = curl_init(
+            "https://api.zarinpal.com/pg/v4/payment/verify.json"
+        );
 
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_HTTPHEADER => [
+                "Content-Type: application/json"
+            ],
+            CURLOPT_TIMEOUT => 30,
+        ]);
 
-        $result = json_decode(curl_exec($ch), true);
+        $response = curl_exec($ch);
+
+        if ($response === false) {
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            return [
+                'ok' => false,
+                'error' => $error,
+            ];
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         curl_close($ch);
+
+        $result = json_decode($response, true);
+
+        if (!is_array($result)) {
+            return [
+                'ok' => false,
+                'error' => 'Invalid JSON response from ZarinPal',
+                'http_code' => $httpCode,
+                'raw_response' => $response,
+            ];
+        }
+
+        $result['_http_code'] = $httpCode;
 
         return $result;
     }

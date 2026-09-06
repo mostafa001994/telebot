@@ -13,7 +13,11 @@ class ProfileHandler extends BaseHandler
             return;
         }
 
-        $subscription = $subscriptionService->getActive($this->telegramId);
+        //$subscription = $subscriptionService->getActive($this->telegramId);
+
+       $subscription = $subscriptionService->getActive(
+              (int) $user['id']
+       );
 
         $text = "👤 حساب کاربری شما
 
