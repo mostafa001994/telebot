@@ -15,15 +15,15 @@ function debugLog(string $text): void
 
 set_exception_handler(function (Throwable $e) {
 
-    file_put_contents(
-        __DIR__ . '/fatal.log',
+    error_log(
         "===== EXCEPTION =====\n" .
-        $e->__toString() .
-        "\n\n",
-        FILE_APPEND
+        $e->__toString()
     );
 
     http_response_code(500);
+
+    echo "ERROR: " . $e->getMessage();
+
     exit;
 });
 
@@ -33,12 +33,9 @@ register_shutdown_function(function () {
 
     if ($error !== null) {
 
-        file_put_contents(
-            __DIR__ . '/fatal.log',
+        error_log(
             "===== FATAL ERROR =====\n" .
-            print_r($error, true) .
-            "\n\n",
-            FILE_APPEND
+            print_r($error, true)
         );
     }
 });
