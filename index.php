@@ -93,6 +93,7 @@ debugLog("Services loaded");
 // Keyboards
 require_once __DIR__ . '/keyboards/MainKeyboard.php';
 require_once __DIR__ . '/keyboards/SubscriptionKeyboard.php';
+require_once __DIR__ . '/keyboards/BackKeyboard.php';
 debugLog("Keyboards loaded");
 
 
