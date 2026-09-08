@@ -1,142 +1,228 @@
 const content = document.getElementById("content");
 
+/* Allowed Pages */
+
+const allowedPages = [
+    "dashboard",
+    "users",
+    "subscription",
+    "plans",
+    "payments",
+    "user_view"
+];
+
+/* Get Current Page */
+
+function getCurrentPage() {
+
+    const hash = window.location.hash;
+
+    if (!hash) {
+        return "dashboard";
+    }
+
+    const page = hash
+        .replace(/^#/, "")
+        .split("?")[0]
+        .trim();
+
+    if (!allowedPages.includes(page)) {
+        return "dashboard";
+    }
+
+    return page;
+
+}
+
+/* Load Page */
+
 async function loadPage(page) {
 
     try {
 
-        const response = await fetch(`pages/${page}.php`);
+        if (!allowedPages.includes(page)) {
+            page = "dashboard";
+        }
 
-        if(!response.ok){
-            throw new Error("Page not found");
+        const response = await fetch(
+            `pages/${encodeURIComponent(page)}.php`,
+            {
+                method: "GET",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                cache: "no-cache"
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Page not found: ${page}`
+            );
         }
 
         const html = await response.text();
 
         content.innerHTML = html;
 
-    } catch(err) {
+    } catch (error) {
+
+        console.error("Load page error:", error);
 
         content.innerHTML = `
+        <div class="table-box">
             <h2>خطا</h2>
-            <p>صفحه مورد نظر پیدا نشد.</p>
-        `;
+            <p>
+                صفحه مورد نظر پیدا نشد.
+            </p>
+        </div>
+    `;
     }
+
 }
+
+/* Menu */
 
 document.querySelectorAll("[data-page]").forEach(link => {
 
-    link.addEventListener("click", e => {
+    link.addEventListener("click", event => {
 
-        e.preventDefault();
+        event.preventDefault();
 
         const page = link.dataset.page;
 
-        history.pushState({}, "", `#${page}`);
+        if (!allowedPages.includes(page)) {
+            return;
+        }
+
+        window.location.hash = page;
 
         loadPage(page);
+
+        // Close mobile sidebar
+        if (sidebar) {
+            sidebar.classList.remove("active");
+        }
 
     });
 
 });
 
-window.addEventListener("load", () => {
+/* Initial Load */
 
-    const page = location.hash.replace("#", "") || "dashboard";
+window.addEventListener("DOMContentLoaded", () => {
 
-    loadPage(page);
-
-});
-
-window.addEventListener("popstate", () => {
-
-    const page = location.hash.replace("#", "") || "dashboard";
+    const page = getCurrentPage();
 
     loadPage(page);
 
 });
 
+/* Hash Navigation */
 
+window.addEventListener("hashchange", () => {
 
+    const page = getCurrentPage();
 
-// 
+    loadPage(page);
 
+});
 
+/* Mobile Sidebar */
 
 const menuBtn = document.getElementById("menuBtn");
 const sidebar = document.querySelector(".sidebar");
-const main = document.querySelector('.content');
-menuBtn.addEventListener("click", () => {
-    sidebar.classList.toggle("active");
-});
+const main = document.querySelector(".content");
 
+if (menuBtn && sidebar) {
 
-main.addEventListener("click", () => {
-    sidebar.classList.remove("active");
-});
+    menuBtn.addEventListener("click", () => {
 
+        sidebar.classList.toggle("active");
 
+    });
 
+}
 
+if (main && sidebar) {
 
+    main.addEventListener("click", () => {
 
+        sidebar.classList.remove("active");
 
+    });
 
+}
 
 /* Modal System */
 
 window.openModal = function (id) {
 
-const modal = document.getElementById(id);
+    const modal = document.getElementById(id);
 
-if (!modal) {
-    console.error("Modal not found:", id);
-    return;
-}
+    if (!modal) {
 
-modal.classList.add("show");
+        console.error(
+            "Modal not found:",
+            id
+        );
 
-document.body.classList.add("modal-open");
+        return;
+    }
+
+    modal.classList.add("show");
+
+    document.body.classList.add("modal-open");
 
 };
 
 window.closeModal = function (id) {
 
-const modal = document.getElementById(id);
+    const modal = document.getElementById(id);
 
-if (!modal) {
-    return;
-}
+    if (!modal) {
+        return;
+    }
 
-modal.classList.remove("show");
+    modal.classList.remove("show");
 
-document.body.classList.remove("modal-open");
+    document.body.classList.remove("modal-open");
 
 };
 
-/*Reset Category Form*/
+/* Reset Category Form */
 
 window.resetCategoryForm = function () {
 
-const form =
-    document.getElementById("categoryForm");
+    const form =
+        document.getElementById("categoryForm");
 
-if (!form) {
-    return;
-}
+    if (!form) {
+        return;
+    }
 
-form.reset();
+    form.reset();
 
-document.getElementById(
-    "categoryAction"
-).value = "create_category";
+    const action =
+        document.getElementById("categoryAction");
 
-document.getElementById(
-    "categoryId"
-).value = "";
+    const id =
+        document.getElementById("categoryId");
 
-document.getElementById(
-    "categoryModalTitle"
-).textContent = "افزودن دسته‌بندی";
+    const title =
+        document.getElementById("categoryModalTitle");
+
+    if (action) {
+        action.value = "create_category";
+    }
+
+    if (id) {
+        id.value = "";
+    }
+
+    if (title) {
+        title.textContent = "افزودن دسته‌بندی";
+    }
 
 };
 
@@ -144,43 +230,68 @@ document.getElementById(
 
 window.editCategory = function (category) {
 
-document.getElementById(
-    "categoryAction"
-).value = "update_category";
+    const action =
+        document.getElementById("categoryAction");
 
-document.getElementById(
-    "categoryId"
-).value = category.id;
+    const id =
+        document.getElementById("categoryId");
 
-document.getElementById(
-    "categoryName"
-).value = category.name || "";
+    const name =
+        document.getElementById("categoryName");
 
-document.getElementById(
-    "categorySlug"
-).value = category.slug || "";
+    const slug =
+        document.getElementById("categorySlug");
 
-document.getElementById(
-    "categoryDescription"
-).value =
-    category.description || "";
+    const description =
+        document.getElementById("categoryDescription");
 
-document.getElementById(
-    "categoryStatus"
-).value =
-    category.status || "active";
+    const status =
+        document.getElementById("categoryStatus");
 
-document.getElementById(
-    "categorySortOrder"
-).value =
-    category.sort_order || 0;
+    const sortOrder =
+        document.getElementById("categorySortOrder");
 
-document.getElementById(
-    "categoryModalTitle"
-).textContent =
-    "ویرایش دسته‌بندی";
+    const title =
+        document.getElementById("categoryModalTitle");
 
-openModal("categoryModal");
+
+    if (action) {
+        action.value = "update_category";
+    }
+
+    if (id) {
+        id.value = category.id;
+    }
+
+    if (name) {
+        name.value = category.name || "";
+    }
+
+    if (slug) {
+        slug.value = category.slug || "";
+    }
+
+    if (description) {
+        description.value =
+            category.description || "";
+    }
+
+    if (status) {
+        status.value =
+            category.status || "active";
+    }
+
+    if (sortOrder) {
+        sortOrder.value =
+            category.sort_order || 0;
+    }
+
+    if (title) {
+        title.textContent =
+            "ویرایش دسته‌بندی";
+    }
+
+    openModal("categoryModal");
 
 };
 
@@ -188,26 +299,37 @@ openModal("categoryModal");
 
 window.resetPlanForm = function () {
 
-const form =
-    document.getElementById("planForm");
+    const form =
+        document.getElementById("planForm");
 
-if (!form) {
-    return;
-}
+    if (!form) {
+        return;
+    }
 
-form.reset();
+    form.reset();
 
-document.getElementById(
-    "planAction"
-).value = "create_plan";
+    const action =
+        document.getElementById("planAction");
 
-document.getElementById(
-    "planId"
-).value = "";
+    const id =
+        document.getElementById("planId");
 
-document.getElementById(
-    "planModalTitle"
-).textContent = "افزودن پلن";
+    const title =
+        document.getElementById("planModalTitle");
+
+
+    if (action) {
+        action.value = "create_plan";
+    }
+
+    if (id) {
+        id.value = "";
+    }
+
+    if (title) {
+        title.textContent =
+            "افزودن پلن";
+    }
 
 };
 
@@ -215,154 +337,198 @@ document.getElementById(
 
 window.editPlan = function (plan) {
 
-document.getElementById(
-    "planAction"
-).value = "update_plan";
+    const action =
+        document.getElementById("planAction");
 
-document.getElementById(
-    "planId"
-).value = plan.id;
+    const id =
+        document.getElementById("planId");
 
-document.getElementById(
-    "planCategoryId"
-).value = plan.category_id;
+    const categoryId =
+        document.getElementById("planCategoryId");
 
-document.getElementById(
-    "planName"
-).value =
-    plan.name || "";
+    const name =
+        document.getElementById("planName");
 
-document.getElementById(
-    "planDurationDays"
-).value =
-    plan.duration_days || "";
+    const durationDays =
+        document.getElementById("planDurationDays");
 
-document.getElementById(
-    "planPrice"
-).value =
-    plan.price || "";
+    const price =
+        document.getElementById("planPrice");
 
-document.getElementById(
-    "planDiscountPrice"
-).value =
-    plan.discount_price !== null
-        ? plan.discount_price
-        : "";
+    const discountPrice =
+        document.getElementById("planDiscountPrice");
 
-document.getElementById(
-    "planStatus"
-).value =
-    plan.status || "active";
+    const status =
+        document.getElementById("planStatus");
 
-document.getElementById(
-    "planSortOrder"
-).value =
-    plan.sort_order || 0;
+    const sortOrder =
+        document.getElementById("planSortOrder");
 
-document.getElementById(
-    "planDescription"
-).value =
-    plan.description || "";
+    const description =
+        document.getElementById("planDescription");
 
-document.getElementById(
-    "planModalTitle"
-).textContent =
-    "ویرایش پلن";
+    const title =
+        document.getElementById("planModalTitle");
 
-openModal("planModal");
+
+    if (action) {
+        action.value = "update_plan";
+    }
+
+    if (id) {
+        id.value = plan.id;
+    }
+
+    if (categoryId) {
+        categoryId.value =
+            plan.category_id || "";
+    }
+
+    if (name) {
+        name.value =
+            plan.name || "";
+    }
+
+    if (durationDays) {
+        durationDays.value =
+            plan.duration_days || "";
+    }
+
+    if (price) {
+        price.value =
+            plan.price || "";
+    }
+
+    if (discountPrice) {
+        discountPrice.value =
+            plan.discount_price !== null &&
+                plan.discount_price !== undefined
+                ? plan.discount_price
+                : "";
+    }
+
+    if (status) {
+        status.value =
+            plan.status || "active";
+    }
+
+    if (sortOrder) {
+        sortOrder.value =
+            plan.sort_order || 0;
+    }
+
+    if (description) {
+        description.value =
+            plan.description || "";
+    }
+
+    if (title) {
+        title.textContent =
+            "ویرایش پلن";
+    }
+
+    openModal("planModal");
 
 };
 
-/* Delete */
+/* Delete Item */
 
 window.deleteItem = async function (
-action,
-id,
-title
+    action,
+    id,
+    title
 ) {
 
-if (!confirm(
-    `آیا از حذف ${title} مطمئن هستید؟`
-)) {
-    return;
-}
-
-
-const formData = new FormData();
-
-formData.append(
-    "action",
-    action
-);
-
-formData.append(
-    "id",
-    id
-);
-
-
-try {
-
-    const response = await fetch(
-        "pages/plans.php",
-        {
-            method: "POST",
-            body: formData,
-            headers: {
-                "X-Requested-With":
-                    "XMLHttpRequest"
-            }
-        }
-    );
-
-
-    const result =
-        await response.json();
-
-
-    if (!result.success) {
-
-        alert(
-            result.message ||
-            "عملیات انجام نشد."
-        );
-
+    if (!confirm(
+        `آیا از حذف ${title} مطمئن هستید؟`
+    )) {
         return;
     }
 
 
-    alert(
-        result.message ||
-        "عملیات با موفقیت انجام شد."
+    const formData =
+        new FormData();
+
+    formData.append(
+        "action",
+        action
+    );
+
+    formData.append(
+        "id",
+        id
     );
 
 
-    await loadPage("plans");
+    try {
 
-} catch (error) {
+        const response =
+            await fetch(
+                "pages/plans.php",
+                {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "X-Requested-With":
+                            "XMLHttpRequest"
+                    }
+                }
+            );
 
-    console.error(error);
 
-    alert(
-        "خطایی در ارتباط با سرور رخ داد."
-    );
-}
+        const result =
+            await response.json();
+
+
+        if (!result.success) {
+
+            alert(
+                result.message ||
+                "عملیات انجام نشد."
+            );
+
+            return;
+        }
+
+
+        alert(
+            result.message ||
+            "عملیات با موفقیت انجام شد."
+        );
+
+
+        await loadPage("plans");
+
+
+    } catch (error) {
+
+        console.error(
+            "Delete error:",
+            error
+        );
+
+        alert(
+            "خطایی در ارتباط با سرور رخ داد."
+        );
+
+    }
 
 };
 
 /* Escape Key */
 
 document.addEventListener(
-"keydown",
-function (event) {
+    "keydown",
+    event => {
 
-    if (event.key !== "Escape") {
-        return;
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        closeModal("categoryModal");
+
+        closeModal("planModal");
+
     }
-
-    closeModal("categoryModal");
-    closeModal("planModal");
-
-}
 
 );
