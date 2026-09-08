@@ -4,11 +4,17 @@ class SupportHandler extends BaseHandler
 {
     public function handle()
     {
-        // اگر خواستی می‌تونی state بذاری برای سیستم تیکت در آینده
+        $userService = new UserService($this->pdo);
         $stateService = new StateService($this->pdo);
 
+        $user = $userService->find($this->telegramId);
+
+        if (!$user) {
+            return;
+        }
+
         $stateService->set(
-            $this->telegramId,
+            (int) $user['id'],
             "support"
         );
 

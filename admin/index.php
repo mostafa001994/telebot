@@ -110,6 +110,11 @@ if (!isset($_SESSION['admin'])) {
                 <a href="#" data-page="subscription">اشتراک ها</a>
             </li>
 
+
+            <li>
+                <a href="#" data-page="plans">پلن ها</a>
+            </li>
+
             <li>
                 <a href="#" data-page="payments">پرداخت ها</a>
             </li>
