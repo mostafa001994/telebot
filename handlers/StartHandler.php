@@ -7,6 +7,8 @@ class StartHandler extends BaseHandler
         $userService = new UserService($this->pdo);
         $stateService = new StateService($this->pdo);
 
+        /* Telegram User */
+
         $telegramUser = [
             'telegram_id' => $this->telegramId,
             'first_name' => $this->message['from']['first_name'] ?? '',
@@ -15,22 +17,43 @@ class StartHandler extends BaseHandler
             'language_code' => $this->message['from']['language_code'] ?? ''
         ];
 
+        /* Sync User */
+
         $user = $userService->sync($telegramUser);
 
-        $stateService->clear($user['id']);
+        /* Clear Previous State */
 
+        $stateService->clear(
+            (int) $user['id']
+        );
 
-file_put_contents(
-    __DIR__ . '/../debug.log',
-    "CHAT ID: ".$this->chatId."\n",
-    FILE_APPEND
-);
+        /* Debug */
+
+        file_put_contents(
+            __DIR__ . '/../debug.log',
+            "CHAT ID: " . $this->chatId . PHP_EOL,
+            FILE_APPEND
+        );
+
+        /* Admin */
+
+        $isAdmin = !empty($user['is_admin']);
+
+        /* Main Keyboard */
+
+        $keyboard = MainKeyboard::get(
+            $isAdmin,
+            $this->telegramId
+        );
+
+        /* Welcome Message */
+
         Telegram::sendMessage(
             $this->chatId,
             "سلام {$telegramUser['first_name']} 👋
 
 به ربات فروش اشتراک خوش آمدید.",
-            MainKeyboard::get()
+            $keyboard
         );
     }
 }
