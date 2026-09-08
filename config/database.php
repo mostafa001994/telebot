@@ -1,5 +1,8 @@
 <?php
 
+require "config.php";
+
+
 $pdo = new PDO(
     "mysql:host=" . DB_HOST .
     ";port=" . DB_PORT .
