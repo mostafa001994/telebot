@@ -9,98 +9,245 @@ class PaymentService
         $this->db = $pdo;
     }
 
-    public function create(int $userId, int $plan, int $amount): int
-    {
+
+
+    //Create payment
+    public function create(
+        int $userId,
+        int $planId,
+        int $amount
+    ): int {
         $stmt = $this->db->prepare("
             INSERT INTO payments
-            (user_id, plan, amount, status)
-            VALUES (?, ?, ?, 'pending')
+            (
+                user_id,
+                plan_id,
+                plan,
+                amount,
+                status
+            )
+            VALUES (?, ?, 0, ?, 'pending')
         ");
 
         $stmt->execute([
             $userId,
-            $plan,
+            $planId,
             $amount
         ]);
 
         return (int) $this->db->lastInsertId();
     }
 
-    public function setAuthority(int $paymentId, string $authority): bool
-    {
+
+    //setAuthority
+
+    public function setAuthority(
+        int $paymentId,
+        string $authority
+    ): bool {
         $stmt = $this->db->prepare("
             UPDATE payments
-            SET authority = ?
+            SET authority = ?,
+                updated_at = NOW()
             WHERE id = ?
         ");
 
-        return $stmt->execute([$authority, $paymentId]);
+        return $stmt->execute([
+            $authority,
+            $paymentId
+        ]);
     }
 
-    public function markPaid(string $authority, string $refId): bool
-    {
+    //Succeded payments 
+    public function markPaid(
+        string $authority,
+        string $refId
+    ): bool {
         $stmt = $this->db->prepare("
             UPDATE payments
             SET status = 'paid',
-                ref_id = ?
+                ref_id = ?,
+                updated_at = NOW()
             WHERE authority = ?
+              AND status = 'pending'
         ");
 
-        return $stmt->execute([$refId, $authority]);
+        return $stmt->execute([
+            $refId,
+            $authority
+        ]);
     }
 
-
-
-
-    public function isPaid($authority): bool
+    //Check payment
+    public function isPaid(string $authority): bool
     {
         $stmt = $this->db->prepare("
-        SELECT status
-        FROM payments
-        WHERE authority = ?
-        LIMIT 1
-    ");
+            SELECT status
+            FROM payments
+            WHERE authority = ?
+            LIMIT 1
+        ");
 
-        $stmt->execute([$authority]);
+        $stmt->execute([
+            $authority
+        ]);
 
-        $status = $stmt->fetchColumn();
-
-        return $status === 'paid';
+        return $stmt->fetchColumn() === 'paid';
     }
 
+    //find By Authority
 
     public function findByAuthority(string $authority)
     {
         $stmt = $this->db->prepare("
-            SELECT * FROM payments
-            WHERE authority = ?
-            LIMIT 1
-        ");
+        SELECT
+            p.*,
 
-        $stmt->execute([$authority]);
+            sp.name AS plan_name,
+            sp.duration_days,
+            sp.price,
+            sp.discount_price,
+
+            sc.name AS category_name
+
+        FROM payments p
+
+        LEFT JOIN subscription_plans sp
+            ON sp.id = p.plan_id
+
+        LEFT JOIN subscription_categories sc
+            ON sc.id = sp.category_id
+
+        WHERE p.authority = ?
+
+        LIMIT 1
+    ");
+
+        $stmt->execute([
+            $authority
+        ]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+
+
+    public function findByAuthorityForUpdate(string $authority)
+    {
+        $stmt = $this->db->prepare("
+        SELECT
+            p.*,
+
+            sp.name AS plan_name,
+            sp.duration_days,
+            sp.price,
+            sp.discount_price,
+
+            sc.name AS category_name
+
+        FROM payments p
+
+        LEFT JOIN subscription_plans sp
+            ON sp.id = p.plan_id
+
+        LEFT JOIN subscription_categories sc
+            ON sc.id = sp.category_id
+
+        WHERE p.authority = ?
+
+        LIMIT 1
+
+        FOR UPDATE
+    ");
+
+        $stmt->execute([
+            $authority
+        ]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+
+
+    //
     public function findById(int $id)
     {
         $stmt = $this->db->prepare("
-            SELECT * FROM payments
-            WHERE id = ?
+            SELECT
+                p.*,
+                sp.name AS plan_name,
+                sp.duration_days,
+                sp.price,
+                sp.discount_price,
+                sc.name AS category_name
+            FROM payments p
+
+            LEFT JOIN subscription_plans sp
+                ON sp.id = p.plan_id
+
+            LEFT JOIN subscription_categories sc
+                ON sc.id = sp.category_id
+
+            WHERE p.id = ?
             LIMIT 1
         ");
 
-        $stmt->execute([$id]);
+        $stmt->execute([
+            $id
+        ]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
 
 
+    public function getUserPayments(int $userId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT
+                p.*,
+                sp.name AS plan_name,
+                sp.duration_days,
+                sc.name AS category_name
+
+            FROM payments p
+
+            LEFT JOIN subscription_plans sp
+                ON sp.id = p.plan_id
+
+            LEFT JOIN subscription_categories sc
+                ON sc.id = sp.category_id
+
+            WHERE p.user_id = ?
+
+            ORDER BY p.id DESC
+        ");
+
+        $stmt->execute([
+            $userId
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
 
 
+    public function markFailed(string $authority): bool
+    {
+        $stmt = $this->db->prepare("
+        UPDATE payments
 
+        SET status = 'failed',
+            updated_at = NOW()
+
+        WHERE authority = ?
+          AND status = 'pending'
+    ");
+
+        return $stmt->execute([
+            $authority
+        ]);
+    }
 
 
 }

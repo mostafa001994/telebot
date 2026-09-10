@@ -9,61 +9,155 @@ class SubscriptionService
         $this->db = $pdo;
     }
 
-    # -----------------------------
-    # دریافت اشتراک فعال
-    # -----------------------------
+    // Get Active Subscriptions
+
     public function getActive(int $userId)
     {
         $stmt = $this->db->prepare("
-            SELECT *
-            FROM subscriptions
-            WHERE user_id = ?
-              AND status = 'active'
-              AND expired_at > NOW()
-            ORDER BY id DESC
+            SELECT
+                s.*,
+
+                sp.name AS plan_name,
+                sp.duration_days,
+                sp.price,
+                sp.discount_price,
+
+                sc.name AS category_name
+
+            FROM subscriptions s
+
+            LEFT JOIN subscription_plans sp
+                ON sp.id = s.plan_id
+
+            LEFT JOIN subscription_categories sc
+                ON sc.id = sp.category_id
+
+            WHERE s.user_id = ?
+              AND s.status = 'active'
+              AND s.expired_at > NOW()
+
+            ORDER BY s.id DESC
+
             LIMIT 1
         ");
 
-        $stmt->execute([$userId]);
+        $stmt->execute([
+            $userId
+        ]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    # -----------------------------
-    # ساخت اشتراک جدید (خرید)
-    # -----------------------------
-    public function createNew(int $userId, int $paymentId, int $plan): int
+
+    // Get User Subscriptions
+
+    public function getUserSubscriptions(int $userId): array
     {
-        $days = $this->planToDays($plan);
+        $stmt = $this->db->prepare("
+            SELECT
+                s.*,
+
+                sp.name AS plan_name,
+                sp.duration_days,
+                sp.price,
+
+                sc.name AS category_name
+
+            FROM subscriptions s
+
+            LEFT JOIN subscription_plans sp
+                ON sp.id = s.plan_id
+
+            LEFT JOIN subscription_categories sc
+                ON sc.id = sp.category_id
+
+            WHERE s.user_id = ?
+
+            ORDER BY s.id DESC
+        ");
+
+        $stmt->execute([
+            $userId
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Create New Subscriptions After Pay
+
+    public function createNew(
+        int $userId,
+        int $paymentId,
+        int $planId
+    ): int {
+        $stmt = $this->db->prepare("
+            SELECT
+                id,
+                duration_days
+            FROM subscription_plans
+            WHERE id = ?
+              AND status = 'active'
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            $planId
+        ]);
+
+        $plan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$plan) {
+            throw new Exception(
+                'Subscription plan not found.'
+            );
+        }
+
+        $days = (int) $plan['duration_days'];
 
         $start = date('Y-m-d H:i:s');
-        $end = date('Y-m-d H:i:s', strtotime("+$days days"));
+
+        $end = date(
+            'Y-m-d H:i:s',
+            strtotime("+{$days} days")
+        );
 
         $stmt = $this->db->prepare("
             INSERT INTO subscriptions
-            (user_id, payment_id, plan, started_at, expired_at, status)
-            VALUES (?, ?, ?, ?, ?, 'active')
+            (
+                user_id,
+                payment_id,
+                plan_id,
+                plan,
+                started_at,
+                expired_at,
+                status
+            )
+            VALUES (?, ?, ?, 0, ?, ?, 'active')
         ");
 
         $stmt->execute([
             $userId,
             $paymentId,
-            $plan,
+            $planId,
             $start,
             $end
         ]);
 
-        return (int)$this->db->lastInsertId();
+        return (int) $this->db->lastInsertId();
     }
 
-    # -----------------------------
-    # تمدید اشتراک (اضافه به زمان فعلی)
-    # -----------------------------
-    public function renew(int $userId, int $plan): bool
-    {
+
+    // Renew Subscription
+
+    public function renew(
+        int $userId,
+        int $planId
+    ): bool {
         $active = $this->getActive($userId);
 
-        $days = $this->planToDays($plan);
+        $days = $this->getPlanDuration(
+            $planId
+        );
 
         $baseDate = $active
             ? $active['expired_at']
@@ -71,77 +165,105 @@ class SubscriptionService
 
         $newExpire = date(
             'Y-m-d H:i:s',
-            strtotime($baseDate . " +$days days")
+            strtotime($baseDate . " +{$days} days")
         );
 
         if ($active) {
 
             $stmt = $this->db->prepare("
                 UPDATE subscriptions
-                SET expired_at = ?, updated_at = NOW()
+
+                SET expired_at = ?,
+                    plan_id = ?,
+                    updated_at = NOW()
+
                 WHERE id = ?
             ");
 
             return $stmt->execute([
                 $newExpire,
+                $planId,
                 $active['id']
             ]);
         }
 
-        // اگر اشتراک نداشت → ساخت جدید
-        return $this->createSimple($userId, $plan, $newExpire);
+        return $this->createSimple(
+            $userId,
+            $planId,
+            $newExpire
+        );
     }
 
-    # -----------------------------
-    # ارتقا اشتراک (بدون از دست رفتن زمان)
-    # -----------------------------
-    public function upgrade(int $userId, int $newPlan): bool
-    {
+    // Upgrade Subscription
+
+    public function upgrade(
+        int $userId,
+        int $newPlanId
+    ): bool {
         $active = $this->getActive($userId);
 
-        $newDays = $this->planToDays($newPlan);
+        $newDays = $this->getPlanDuration(
+            $newPlanId
+        );
 
         if (!$active) {
+
             return $this->createSimple(
                 $userId,
-                $newPlan,
-                date('Y-m-d H:i:s', strtotime("+$newDays days"))
+                $newPlanId,
+                date(
+                    'Y-m-d H:i:s',
+                    strtotime("+{$newDays} days")
+                )
             );
         }
 
         $remainingSeconds =
             strtotime($active['expired_at']) - time();
 
-        $remainingDays = max(0, ceil($remainingSeconds / 86400));
+        $remainingDays = max(
+            0,
+            (int) ceil(
+                $remainingSeconds / 86400
+            )
+        );
 
-        $totalDays = $remainingDays + $newDays;
+        $totalDays =
+            $remainingDays + $newDays;
 
         $newExpire = date(
             'Y-m-d H:i:s',
-            strtotime("+$totalDays days")
+            strtotime("+{$totalDays} days")
         );
 
         $stmt = $this->db->prepare("
             UPDATE subscriptions
-            SET plan = ?, expired_at = ?, updated_at = NOW()
+
+            SET plan_id = ?,
+                expired_at = ?,
+                updated_at = NOW()
+
             WHERE id = ?
         ");
 
         return $stmt->execute([
-            $newPlan,
+            $newPlanId,
             $newExpire,
             $active['id']
         ]);
     }
 
-    # -----------------------------
-    # Expire خودکار
-    # -----------------------------
+
+    // Expire Old Subscription
+
     public function expireOld(): int
     {
         $stmt = $this->db->prepare("
             UPDATE subscriptions
-            SET status = 'expired'
+
+            SET status = 'expired',
+                updated_at = NOW()
+
             WHERE expired_at <= NOW()
               AND status = 'active'
         ");
@@ -151,31 +273,66 @@ class SubscriptionService
         return $stmt->rowCount();
     }
 
-    # -----------------------------
-    # Helper
-    # -----------------------------
-    private function planToDays(int $plan): int
-    {
-        return match ($plan) {
-            1 => 30,
-            3 => 90,
-            12 => 365,
-            default => 30
-        };
+
+    // GetPlanDuration
+
+    private function getPlanDuration(
+        int $planId
+    ): int {
+        $stmt = $this->db->prepare("
+            SELECT duration_days
+
+            FROM subscription_plans
+
+            WHERE id = ?
+              AND status = 'active'
+
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            $planId
+        ]);
+
+        $days = $stmt->fetchColumn();
+
+        if (!$days) {
+            throw new Exception(
+                'Subscription plan not found.'
+            );
+        }
+
+        return (int) $days;
     }
 
-    private function createSimple(int $userId, int $plan, string $expire)
-    {
+    
+    // ساخت اشتراک بدون پرداخت
+    // فعلاً برای سازگاری با سیستم قبلی نگه داشته شده.
+
+    private function createSimple(
+        int $userId,
+        int $planId,
+        string $expire
+    ): bool {
         $stmt = $this->db->prepare("
             INSERT INTO subscriptions
-            (user_id, payment_id, plan, started_at, expired_at, status)
-            VALUES (?, 0, ?, NOW(), ?, 'active')
+            (
+                user_id,
+                payment_id,
+                plan_id,
+                plan,
+                started_at,
+                expired_at,
+                status
+            )
+            VALUES (?, 0, ?, 0, NOW(), ?, 'active')
         ");
 
         return $stmt->execute([
             $userId,
-            $plan,
+            $planId,
             $expire
         ]);
     }
+
 }
